@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时多用户绘画板</title>
+    <style>
+        body { display: flex; flex-direction: column; align-items: center; margin: 0; padding: 20px; }
+        canvas { border: 1px solid #000; }
+        #toolbar { margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+<h2>实时多用户绘画板</h2>
+<div id="toolbar">
+    <label for="colorPicker">颜色选择：</label>
+    <input type="color" id="colorPicker" value="#000000">
+    <label for="brushSize">画笔大小：</label>
+    <input type="range" id="brushSize" min="1" max="20" value="5">
+    <button onclick="undo()">撤销</button>
+    <button onclick="redo()">重做</button>
+</div>
+<canvas id="canvas" width="800" height="600"></canvas>
+<script src="https://cdn.jsdelivr.net/npm/sockjs-client/dist/sockjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/stompjs/lib/stomp.min.js"></script>
+<script>
+    const canvas = document.getElementById('canvas');
+    const context = canvas.getContext('2d');
+    let current = { color: document.getElementById('colorPicker').value, size: document.getElementById('brushSize').value };
+    let drawing = false;
+    const stompClient = Stomp.over(new SockJS('/paint'));
+    stompClient.connect({}, () => {
+        stompClient.subscribe('/topic/paint', (message) => {
+            const data = JSON.parse(message.body);
+            drawOnCanvas(data.x0, data.y0, data.x1, data.y1, data.color, data.size);
+        });
+    });
+
+    function drawOnCanvas(x0, y0, x1, y1, color, size) {
+        context.beginPath();
+        context.moveTo(x0, y0);
+        context.lineTo(x1, y1);
+        context.strokeStyle = color;
+        context.lineWidth = size;
+        context.stroke();
+        context.closePath();
+    }
+
+    function drawLine(x0, y0, x1, y1) {
+        drawOnCanvas(x0, y0, x1, y1, current.color, current.size);
+        stompClient.send("/app/draw", {}, JSON.stringify({x0, y0, x1, y1, color: current.color, size: current.size}));
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+        drawing = true;
+        current.x = e.offsetX;
+        current.y = e.offsetY;
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+        if (!drawing) return;
+        drawLine(current.x, current.y, e.offsetX, e.offsetY);
+        current.x = e.offsetX;
+        current.y = e.offsetY;
+    });
+
+    canvas.addEventListener('mouseup', () => { drawing = false; });
+    canvas.addEventListener('mouseout', () => { drawing = false; });
+
+    document.getElementById('colorPicker').addEventListener('change', (e) => {
+        current.color = e.target.value;
+    });
+
+    document.getElementById('brushSize').addEventListener('change', (e) => {
+        current.size = e.target.value;
+    });
+
+    // 撤销和重做功能需要额外的逻辑和存储
+    function undo() { /* 需要实现 */ }
+    function redo() { /* 需要实现 */ }
+</script>
+</body>
+</html>

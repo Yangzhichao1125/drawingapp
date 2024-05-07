@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Paint Board</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs/lib/stomp.min.js"></script>
+</head>
+<body>
+<canvas id="myCanvas" width="800" height="600" style="border:1px solid #000000;"></canvas>
+<script>
+    var canvas = document.getElementById('myCanvas');
+    var context = canvas.getContext('2d');
+
+    var stompClient = null;
+
+    function connect() {
+        var socket = new SockJS('/paint');
+        stompClient = Stomp.over(socket);
+        stompClient.connect({}, function(frame) {
+            console.log('Connected: ' + frame);
+            stompClient.subscribe('/topic/paint', function(message) {
+                draw(JSON.parse(message.body));
+            });
+        });
+    }
+
+    function draw(data) {
+        context.beginPath();
+        context.arc(data.x, data.y, 2, 0, 2 * Math.PI, false);
+        context.fillStyle = 'black';
+        context.fill();
+    }
+
+    canvas.addEventListener('mousedown', function(event) {
+        sendPaintData({x: event.pageX - this.offsetLeft, y: event.pageY - this.offsetTop});
+    });
+
+    function sendPaintData(data) {
+        stompClient.send("/app/draw", {}, JSON.stringify(data));
+    }
+
+    connect();
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+server:
+  port: 8088  # HTTP服务器端口
+
+spring:
+  application:
+    name: drawing-app  # 应用名称
+
+
+  # WebSocket配置
+#  websocket:
+#    message-broker:
+#      endpoint: /ws  # WebSocket连接端点
+#      application-destination-prefix: /app  # 应用目的地前缀
+#      topic-destination-prefix: /topic  # 消息主题前缀
