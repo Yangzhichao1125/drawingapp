@@ -15,6 +15,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         // 使用SockJS，使得即使浏览器不支持原生WebSocket也可以使用。
         registry.addEndpoint("/paint").withSockJS();
+//        registry.addEndpoint("/api/board/{boardId}/ws").withSockJS();
     }
 
     @Override

@@ -24,19 +24,49 @@
 <script src="https://cdn.jsdelivr.net/npm/sockjs-client/dist/sockjs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/stompjs/lib/stomp.min.js"></script>
 <script>
+
+    function getQueryVariable(variable) {
+        var query = window.location.search.substring(1);
+        var vars = query.split('&');
+        for (var i = 0; i < vars.length; i++) {
+            var pair = vars[i].split('=');
+            if (decodeURIComponent(pair[0]) === variable) {
+                return decodeURIComponent(pair[1]);
+            }
+        }
+        return null;
+    }
+
+    const boardId = getQueryVariable('boardId');
     const canvas = document.getElementById('canvas');
     const context = canvas.getContext('2d');
     let current = { color: document.getElementById('colorPicker').value, size: document.getElementById('brushSize').value };
     let drawing = false;
-    const stompClient = Stomp.over(new SockJS('/paint'));
+    let path = [];  // Store the path drawn by the user
+    const endpoint = `/paint`;
+    // const endpoint = `/api/board/${boardId}/ws`;
+    const stompClient = Stomp.over(new SockJS(endpoint));
+    const undoStack = [];
+    const redoStack = [];
+
+    // stompClient.connect({}, () => {
+    //     stompClient.subscribe('/topic/paint', (message) => {
+    //         const data = JSON.parse(message.body);
+    //         drawOnCanvas(data.x0, data.y0, data.x1, data.y1, data.color, data.size, false);
+    //     });
+    // });
+
     stompClient.connect({}, () => {
         stompClient.subscribe('/topic/paint', (message) => {
-            const data = JSON.parse(message.body);
-            drawOnCanvas(data.x0, data.y0, data.x1, data.y1, data.color, data.size);
+            const actions = JSON.parse(message.body); // 解析成绘图动作数组
+            actions.forEach(action => {
+                arrDrawOnCanvas(action.x0, action.y0, action.x1, action.y1, action.color, action.size, false);
+            });
         });
     });
 
-    function drawOnCanvas(x0, y0, x1, y1, color, size) {
+
+    function arrDrawOnCanvas(x0, y0, x1, y1, color, size, save = true) {
         context.beginPath();
         context.moveTo(x0, y0);
         context.lineTo(x1, y1);
@@ -44,11 +74,36 @@
         context.lineWidth = size;
         context.stroke();
         context.closePath();
+        if (save) {
+            undoStack.push({x0, y0, x1, y1, color, size});
+            redoStack.length = 0; // 重置重做栈
+        }
+    }
+
+    function drawOnCanvas(x0, y0, x1, y1, color, size, save = true) {
+        context.beginPath();
+        context.moveTo(x0, y0);
+        context.lineTo(x1, y1);
+        context.strokeStyle = color;
+        context.lineWidth = size;
+        context.stroke();
+        context.closePath();
+        if (save) {
+            undoStack.push({x0, y0, x1, y1, color, size});
+            redoStack.length = 0;
+        }
     }
 
     function drawLine(x0, y0, x1, y1) {
         drawOnCanvas(x0, y0, x1, y1, current.color, current.size);
-        stompClient.send("/app/draw", {}, JSON.stringify({x0, y0, x1, y1, color: current.color, size: current.size}));
+        path.push({x0, y0, x1, y1, color: current.color, size: current.size});
+    }
+
+    function sendPath() {
+        if (path.length > 0) {
+            stompClient.send("/app/draw", {}, JSON.stringify(path));
+            path = [];
+        }
     }
 
     canvas.addEventListener('mousedown', (e) => {
@@ -64,8 +119,17 @@
         current.y = e.offsetY;
     });
 
-    canvas.addEventListener('mouseup', () => { drawing = false; });
-    canvas.addEventListener('mouseout', () => { drawing = false; });
+    canvas.addEventListener('mouseup', () => {
+        drawing = false;
+        sendPath();  // Send the entire path on mouse up
+    });
+
+    canvas.addEventListener('mouseout', () => {
+        if (drawing) {
+            drawing = false;
+            sendPath();  // Ensure the path is sent even if the user leaves the canvas
+        }
+    });
 
     document.getElementById('colorPicker').addEventListener('change', (e) => {
         current.color = e.target.value;
@@ -74,10 +138,6 @@
     document.getElementById('brushSize').addEventListener('change', (e) => {
         current.size = e.target.value;
     });
-
-    // 撤销和重做功能需要额外的逻辑和存储
-    function undo() { /* 需要实现 */ }
-    function redo() { /* 需要实现 */ }
 </script>
 </body>
 </html>

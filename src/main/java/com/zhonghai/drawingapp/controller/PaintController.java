@@ -1,23 +1,35 @@
 package com.zhonghai.drawingapp.controller;
 
+import com.zhonghai.drawingapp.entity.JoinEntity;
+import com.zhonghai.drawingapp.resopnse.ApiResponse;
+import com.zhonghai.drawingapp.resopnse.ApiStatus;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/board/{boardId}")
 public class PaintController {
 
     @PostMapping("/join")
-    public ResponseEntity<String> joinBoard(@PathVariable String boardId, @RequestBody String nickname) {
-        // 这里需要实现逻辑来判断画板是否存在，以及用户是否可以加入
-        boolean boardExists = true; // 假设这里有逻辑来检查画板是否存在
+    public ResponseEntity<ApiResponse> joinBoard(@PathVariable Integer boardId, @RequestBody JoinEntity joinEntity) {
+        // 这里需要实现逻辑来判断画板是否存在，以及用户是否可以加入 todo
+        boolean boardExists = null != boardId && boardId >= 100;
+
         if (boardExists) {
-            // 这里可以添加用户到画板的逻辑
-            return ResponseEntity.ok("成功加入画板");
+            String nickname = "";
+            if (joinEntity.getNickname() == null || StringUtils.hasLength(joinEntity.getNickname())) {
+                nickname = "User_" + UUID.randomUUID().toString().substring(0, 8); // 生成随机昵称
+            }
+            ApiResponse response = new ApiResponse(ApiStatus.SUCCESS.isSuccess(), ApiStatus.SUCCESS.getMessage(), nickname);
+            return ResponseEntity.status(ApiStatus.SUCCESS.getStatusCode()).body(response);
         } else {
-            return ResponseEntity.status(404).body("画板不存在或无法加入");
+            ApiResponse response = new ApiResponse(ApiStatus.BOARD_NOT_FOUND.isSuccess(), ApiStatus.BOARD_NOT_FOUND.getMessage(), null);
+            return ResponseEntity.status(ApiStatus.BOARD_NOT_FOUND.getStatusCode()).body(response);
         }
     }
 
@@ -39,6 +51,7 @@ public class PaintController {
     @MessageMapping("/draw")
     @SendTo("/topic/paint")
     public String handleDraw(String message) {
+        System.out.println("message = " + message);
         return message; // 直接将接收到的绘画数据广播给所有订阅者
     }
 }
