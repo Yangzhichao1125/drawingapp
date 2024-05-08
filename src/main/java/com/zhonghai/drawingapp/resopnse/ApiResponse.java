@@ -3,12 +3,14 @@ package com.zhonghai.drawingapp.resopnse;
 import lombok.Data;
 
 @Data
-public class ApiResponse {
-    private boolean success;
+public class ApiResponse<T> {
+    private Integer code;
+    private Boolean success;
     private String message;
-    private String data; // 这里用String类型存储nickname，根据需要可以扩展或修改
+    private T data;  // 使用泛型类型T来替代具体的数据类型
 
-    public ApiResponse(boolean success, String message, String data) {
+    public ApiResponse(Integer code, Boolean success, String message, T data) {
+        this.code = code;
         this.success = success;
         this.message = message;
         this.data = data;

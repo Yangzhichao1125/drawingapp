@@ -4,7 +4,9 @@ server:
 spring:
   application:
     name: drawing-app  # 应用名称
-
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/drawboard
 
   # WebSocket配置
 #  websocket:
