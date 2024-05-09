@@ -6,6 +6,7 @@ import com.zhonghai.drawingapp.entity.UserAction;
 import com.zhonghai.drawingapp.resopnse.ApiResponse;
 import com.zhonghai.drawingapp.service.DrawingService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.web.bind.annotation.*;
@@ -35,11 +36,12 @@ public class PaintController {
         return drawingService.action(boardId,userAction);
     }
 
-    // WebSocket接口仍然按照之前的配置
-    @MessageMapping("/draw")
-    @SendTo("/topic/paint")
-    public String handleDraw(String message) {
+
+    @MessageMapping("/api/board/{boardId}/action")
+    @SendTo("/topic/api/board/{boardId}/paint")
+    public String handleBoardAction(@DestinationVariable("boardId") String boardId, String message) {
         System.out.println("message = " + message);
-        return message; // 直接将接收到的绘画数据广播给所有订阅者
+        // 业务逻辑处理
+        return message;
     }
 }

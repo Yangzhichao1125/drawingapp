@@ -38,13 +38,21 @@
     }
 
     const boardId = getQueryVariable('boardId');
+    console.log('boardId = ' + boardId);
     const canvas = document.getElementById('canvas');
     const context = canvas.getContext('2d');
     let current = { color: document.getElementById('colorPicker').value, size: document.getElementById('brushSize').value };
     let drawing = false;
     let path = [];  // Store the path drawn by the user
-    const endpoint = `/paint`;
-    // const endpoint = `/api/board/${boardId}/ws`;
+    // const endpoint = `/paint`;
+    const endpoint = `/api/board/${boardId}/ws`;
+    console.log('endpoint = ' + endpoint);
+    // const subPath = '/topic/paint';
+    // const actionPath = '/app/draw';
+    const subPath = `/topic/api/board/${boardId}/paint`;
+    const actionPath = `/app/api/board/${boardId}/action`;
+    console.log('subPath = ' + subPath);
+    console.log('actionPath = ' + actionPath);
     const stompClient = Stomp.over(new SockJS(endpoint));
     const undoStack = [];
     const redoStack = [];
@@ -57,7 +65,7 @@
     // });
 
     stompClient.connect({}, () => {
-        stompClient.subscribe('/topic/paint', (message) => {
+        stompClient.subscribe(subPath, (message) => {
             const actions = JSON.parse(message.body); // 解析成绘图动作数组
             actions.forEach(action => {
                 arrDrawOnCanvas(action.x0, action.y0, action.x1, action.y1, action.color, action.size, false);
@@ -101,7 +109,7 @@
 
     function sendPath() {
         if (path.length > 0) {
-            stompClient.send("/app/draw", {}, JSON.stringify(path));
+            stompClient.send(actionPath, {}, JSON.stringify(path));
             path = [];
         }
     }
