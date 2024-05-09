@@ -39,9 +39,17 @@ public class PaintController {
 
     @MessageMapping("/api/board/{boardId}/action")
     @SendTo("/topic/api/board/{boardId}/paint")
-    public String handleBoardAction(@DestinationVariable("boardId") String boardId, String message) {
-        System.out.println("message = " + message);
+    public ResponseEntity<ApiResponse> handleBoardAction(@DestinationVariable("boardId") Integer boardId, @RequestBody UserAction userAction) {
+        System.out.println("userAction = " + userAction.toString());
         // 业务逻辑处理
-        return message;
+        return drawingService.action(boardId,userAction);
     }
+
+//    @MessageMapping("/api/board/{boardId}/action")
+//    @SendTo("/topic/api/board/{boardId}/paint")
+//    public String handleBoardAction(@DestinationVariable("boardId") Integer boardId, @RequestBody UserAction userAction) {
+//        System.out.println("userAction = " + userAction.toString());
+//        // 业务逻辑处理
+//        return userAction.getMessage();
+//    }
 }

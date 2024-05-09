@@ -5,13 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>实时多用户绘画板</title>
     <style>
-        body { display: flex; flex-direction: column; align-items: center; margin: 0; padding: 20px; }
-        canvas { border: 1px solid #000; }
-        #toolbar { margin-bottom: 10px; }
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        canvas {
+            border: 1px solid #000;
+        }
+
+        #toolbar {
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body>
 <h2>实时多用户绘画板</h2>
+<div id="nicknameDisplay"></div>
 <div id="toolbar">
     <label for="colorPicker">颜色选择：</label>
     <input type="color" id="colorPicker" value="#000000">
@@ -39,9 +52,57 @@
 
     const boardId = getQueryVariable('boardId');
     console.log('boardId = ' + boardId);
+
+    // 在进入页面时发送POST请求加入画板
+    fetch(`http://localhost:8088/api/board/${boardId}/join`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({nickname: "User_5176a1ab"})
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.data && data.data.nickname) {
+                document.getElementById('nicknameDisplay').innerText = `昵称: ${data.data.nickname}`;
+                this.userName = data.data.nickname;
+                // 加载画板数据
+                fetchBoardData();
+            } else {
+                throw new Error('没有正确的昵称返回或加入失败');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('错误: ' + error.message);
+        });
+
+    // 获取画板数据
+    function fetchBoardData() {
+        fetch(`http://localhost:8088/api/board/${boardId}/data`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && Array.isArray(data.data)) {
+                    data.data.forEach(board => {
+                        board.actions.forEach(action => {
+                            drawOnCanvas(action.x0, action.y0, action.x1, action.y1, action.color, action.size);
+                        });
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('获取画板数据失败:', error);
+                alert('获取画板数据失败: ' + error.message);
+            });
+    }
+
+    const userName = '';
     const canvas = document.getElementById('canvas');
     const context = canvas.getContext('2d');
-    let current = { color: document.getElementById('colorPicker').value, size: document.getElementById('brushSize').value };
+    let current = {
+        color: document.getElementById('colorPicker').value,
+        size: document.getElementById('brushSize').value
+    };
     let drawing = false;
     let path = [];  // Store the path drawn by the user
     // const endpoint = `/paint`;
@@ -50,29 +111,43 @@
     // const subPath = '/topic/paint';
     // const actionPath = '/app/draw';
     const subPath = `/topic/api/board/${boardId}/paint`;
-    const actionPath = `/app/api/board/${boardId}/action`;
     console.log('subPath = ' + subPath);
+    const actionPath = `/app/api/board/${boardId}/action`;
     console.log('actionPath = ' + actionPath);
     const stompClient = Stomp.over(new SockJS(endpoint));
     const undoStack = [];
     const redoStack = [];
+    const test = null;
 
+    //
     // stompClient.connect({}, () => {
-    //     stompClient.subscribe('/topic/paint', (message) => {
-    //         const data = JSON.parse(message.body);
-    //         drawOnCanvas(data.x0, data.y0, data.x1, data.y1, data.color, data.size, false);
+    //     stompClient.subscribe(subPath, (message) => {
+    //         const actions = JSON.parse(message.body); // 解析成绘图动作数组
+    //         console.log('response: '+ message.body);
+    //         actions.forEach(action => {
+    //             arrDrawOnCanvas(action.x0, action.y0, action.x1, action.y1, action.color, action.size, false);
+    //         });
     //     });
     // });
-
     stompClient.connect({}, () => {
         stompClient.subscribe(subPath, (message) => {
-            const actions = JSON.parse(message.body); // 解析成绘图动作数组
-            actions.forEach(action => {
-                arrDrawOnCanvas(action.x0, action.y0, action.x1, action.y1, action.color, action.size, false);
-            });
+            const response = JSON.parse(message.body);
+            this.test = response;
+            console.log("Received response:", response);
+            if (response.body.success && response.body.data) {
+                const actionsString = response.body.data.message; // 这是一个JSON字符串
+                console.log("actionsString:", actionsString);
+                const actions = JSON.parse(actionsString); // 将字符串解析为数组
+                // const actions = JSON.parse(response.data.message); // 解析data中的message字符串为动作数组
+                console.log("actions:", actions);
+                actions.forEach(action => {
+                    arrDrawOnCanvas(action.x0, action.y0, action.x1, action.y1, action.color, action.size, false);
+                });
+            } else {
+                console.error('Failed to receive drawing data:', response.message);
+            }
         });
     });
-
 
     function arrDrawOnCanvas(x0, y0, x1, y1, color, size, save = true) {
         context.beginPath();
@@ -107,10 +182,22 @@
         path.push({x0, y0, x1, y1, color: current.color, size: current.size});
     }
 
+    // function sendPath() {
+    //     if (path.length > 0) {
+    //         stompClient.send(actionPath, {}, JSON.stringify(path));
+    //         path = [];
+    //     }
+    // }
     function sendPath() {
         if (path.length > 0) {
-            stompClient.send(actionPath, {}, JSON.stringify(path));
-            path = [];
+            const payload = {
+                type: 1,
+                drawingId: "663b56a4bf225616149dc448", // 这个ID应根据实际情况动态生成或获取
+                message: JSON.stringify(path),
+                nickName: this.userName // 这个昵称应根据实际用户信息动态获取
+            };
+            stompClient.send(actionPath, {}, JSON.stringify(payload));
+            path = []; // 清空路径数组以准备下一次绘画
         }
     }
 
