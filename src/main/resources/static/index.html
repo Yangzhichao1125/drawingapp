@@ -18,6 +18,7 @@
         }
 
         #toolbar {
+            margin-top: 10px;
             margin-bottom: 10px;
         }
     </style>
@@ -50,6 +51,7 @@
         return null;
     }
 
+    const test = null;
     const boardId = getQueryVariable('boardId');
     console.log('boardId = ' + boardId);
 
@@ -59,7 +61,7 @@
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({nickname: "User_5176a1ab"})
+        body: JSON.stringify({nickname: ""})
     })
         .then(response => response.json())
         .then(data => {
@@ -117,51 +119,44 @@
     const stompClient = Stomp.over(new SockJS(endpoint));
     const undoStack = [];
     const redoStack = [];
-    const test = null;
+    const undoObjStack = [];
+    const redoObjStack = [];
 
-    //
-    // stompClient.connect({}, () => {
-    //     stompClient.subscribe(subPath, (message) => {
-    //         const actions = JSON.parse(message.body); // 解析成绘图动作数组
-    //         console.log('response: '+ message.body);
-    //         actions.forEach(action => {
-    //             arrDrawOnCanvas(action.x0, action.y0, action.x1, action.y1, action.color, action.size, false);
-    //         });
-    //     });
-    // });
+
     stompClient.connect({}, () => {
         stompClient.subscribe(subPath, (message) => {
             const response = JSON.parse(message.body);
             this.test = response;
-            console.log("Received response:", response);
             if (response.body.success && response.body.data) {
-                const actionsString = response.body.data.message; // 这是一个JSON字符串
-                console.log("actionsString:", actionsString);
-                const actions = JSON.parse(actionsString); // 将字符串解析为数组
-                // const actions = JSON.parse(response.data.message); // 解析data中的message字符串为动作数组
-                console.log("actions:", actions);
-                actions.forEach(action => {
-                    arrDrawOnCanvas(action.x0, action.y0, action.x1, action.y1, action.color, action.size, false);
-                });
+                const result = response.body.data;
+                switch (result.type) {
+                    case 1: // 绘画逻辑
+                        const actionsString = result.message; // 这是一个JSON字符串
+                        const actions = JSON.parse(actionsString); // 将字符串解析为数组
+                        actions.forEach(action => {
+                            drawOnCanvas(action.x0, action.y0, action.x1, action.y1, action.color, action.size, false);
+                        });
+                        undoObjStack.push(result);
+                        break;
+                    case 2: // 撤销逻辑
+                    case 3: // 重做逻辑
+                        // 清空画板
+                        context.clearRect(0, 0, canvas.width, canvas.height);
+                        //重新绘制
+                        result.drawings.forEach(board => {
+                            board.actions.forEach(action => {
+                                drawOnCanvas(action.x0, action.y0, action.x1, action.y1, action.color, action.size);
+                            });
+                        });
+                        break;
+                    default:
+                        console.error('Unhandled type:', result.type);
+                }
             } else {
                 console.error('Failed to receive drawing data:', response.message);
             }
         });
     });
-
-    function arrDrawOnCanvas(x0, y0, x1, y1, color, size, save = true) {
-        context.beginPath();
-        context.moveTo(x0, y0);
-        context.lineTo(x1, y1);
-        context.strokeStyle = color;
-        context.lineWidth = size;
-        context.stroke();
-        context.closePath();
-        if (save) {
-            undoStack.push({x0, y0, x1, y1, color, size});
-            redoStack.length = 0; // 重置重做栈
-        }
-    }
 
     function drawOnCanvas(x0, y0, x1, y1, color, size, save = true) {
         context.beginPath();
@@ -182,17 +177,10 @@
         path.push({x0, y0, x1, y1, color: current.color, size: current.size});
     }
 
-    // function sendPath() {
-    //     if (path.length > 0) {
-    //         stompClient.send(actionPath, {}, JSON.stringify(path));
-    //         path = [];
-    //     }
-    // }
     function sendPath() {
         if (path.length > 0) {
             const payload = {
                 type: 1,
-                drawingId: "663b56a4bf225616149dc448", // 这个ID应根据实际情况动态生成或获取
                 message: JSON.stringify(path),
                 nickName: this.userName // 这个昵称应根据实际用户信息动态获取
             };
@@ -233,6 +221,44 @@
     document.getElementById('brushSize').addEventListener('change', (e) => {
         current.size = e.target.value;
     });
+
+
+    function undo() {
+        // 逆序查找第一个属于该用户的操作，并出栈
+        for (let i = undoObjStack.length - 1; i >= 0; i--) {
+            if (undoObjStack[i].nickName === this.userName) {
+                const operation = undoObjStack.splice(i, 1)[0];
+                //重做入栈
+                redoObjStack.push(operation);
+                const payload = {
+                    type: 2,
+                    nickName: this.userName, // 这个昵称应根据实际用户信息动态获取
+                    drawingId: operation.drawingId
+                };
+                stompClient.send(actionPath, {}, JSON.stringify(payload));
+                break;
+            }
+        }
+    }
+
+    function redo() {
+        // 逆序查找第一个属于该用户的操作，并出栈
+        for (let i = redoObjStack.length - 1; i >= 0; i--) {
+            if (redoObjStack[i].nickName === this.userName) {
+                const operation = redoObjStack.splice(i, 1)[0];
+                //撤销入栈
+                undoObjStack.push(operation);
+                const payload = {
+                    type: 3,
+                    nickName: this.userName, // 这个昵称应根据实际用户信息动态获取
+                    drawingId: operation.drawingId
+                };
+                stompClient.send(actionPath, {}, JSON.stringify(payload));
+                break;
+            }
+        }
+
+    }
 </script>
 </body>
 </html>

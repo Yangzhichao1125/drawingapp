@@ -87,29 +87,32 @@ public class DrawingServiceImpl implements DrawingService {
             return drawAction(boardId, userAction);
         } else if (ActionType.UNDO.getCode().equals(userAction.getType())) {
             //撤销逻辑
-            return undoAction(userAction);
+            return redoOrUndoAction(boardId, userAction, false);
         } else if (ActionType.REDO.getCode().equals(userAction.getType())) {
             //重做逻辑
-            return redoAction(boardId, userAction);
+            return redoOrUndoAction(boardId, userAction, true);
         }
         return null;
     }
 
-    private ResponseEntity<ApiResponse> redoAction(Integer boardId, UserAction userAction) {
-        //数据持久化
-        updateDrawingEnableByBoardId(boardId, false, userAction.getNickName());
-        //前端根据type类型，清空画布即可
-        ApiResponse response = new ApiResponse(ApiStatus.SUCCESS.getStatusCode(), ApiStatus.SUCCESS.isSuccess(), ApiStatus.SUCCESS.getMessage(), userAction);
-        return ResponseEntity.status(ApiStatus.SUCCESS.getStatusCode()).body(response);
-    }
+//    private ResponseEntity<ApiResponse> redoAction(Integer boardId, UserAction userAction) {
+//        //数据持久化
+//        updateDrawingEnableByBoardId(boardId, false, userAction.getNickName());
+//        //前端根据type类型，清空画布即可
+//        ApiResponse response = new ApiResponse(ApiStatus.SUCCESS.getStatusCode(), ApiStatus.SUCCESS.isSuccess(), ApiStatus.SUCCESS.getMessage(), userAction);
+//        return ResponseEntity.status(ApiStatus.SUCCESS.getStatusCode()).body(response);
+//    }
 
 
-    private ResponseEntity<ApiResponse> undoAction(UserAction userAction) {
+    private ResponseEntity<ApiResponse> redoOrUndoAction(Integer boardId, UserAction userAction, Boolean redo) {
         //数据持久化
         //根据id逻辑删除 drawing
-        updateDrawingEnableById(userAction.getDrawingId(), false, userAction.getNickName());
+        updateDrawingEnableById(userAction.getDrawingId(), redo, userAction.getNickName());
 
-        //前端根据id删除数据，重画即可
+        List<Drawing> drawings = drawingRepository.findByBoardIdAndEnable(boardId, true);
+
+        userAction.setDrawings(drawings);
+        //返回前端
         ApiResponse response = new ApiResponse(ApiStatus.SUCCESS.getStatusCode(), ApiStatus.SUCCESS.isSuccess(), ApiStatus.SUCCESS.getMessage(), userAction);
         return ResponseEntity.status(ApiStatus.SUCCESS.getStatusCode()).body(response);
     }

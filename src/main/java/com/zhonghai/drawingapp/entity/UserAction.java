@@ -2,6 +2,8 @@ package com.zhonghai.drawingapp.entity;
 
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class UserAction {
 
@@ -10,4 +12,5 @@ public class UserAction {
     private String message;
     private String drawingId;
     private String nickName;
+    private List<Drawing> drawings;
 }
